@@ -2,73 +2,44 @@
 
 Sistema web com IA que gera atividades em diferentes níveis de aprendizagem para professores da educação básica.
 
-## O problema
+## Problema
 
-Uma mesma turma reúne estudantes com defasagens, estudantes com deficiência e estudantes que já dominam o conteúdo. Produzir atividades adequadas a todos esses perfis exige tempo, planejamento e recursos que o professor nem sempre tem.
+Uma mesma turma reúne estudantes com defasagens, estudantes com deficiência e estudantes que já dominam o conteúdo. Preparar atividades para todos esses perfis exige tempo que o professor nem sempre tem.
 
-> Origem: ideia 10 da lista do cliente (professor Ricardo), "Dificuldade de produzir atividades para diferentes níveis de aprendizagem".
+## Solução
 
-## A solução
+O professor informa disciplina, série e tema, e o sistema gera a mesma atividade em quatro versões (reforço, padrão, avançado e adaptada), com gabarito. A IA atua como assistente, e o professor revisa e edita o resultado.
 
-O professor informa **disciplina, série e tema**, e o **nivela-ai** gera a mesma atividade em quatro versões, com gabarito:
+## Stack
 
-| Nível | Descrição |
-|---|---|
-| Reforço | Linguagem mais simples, com passo a passo |
-| Padrão | Adequada ao nível da série |
-| Avançado | Desafios para quem já domina o conteúdo |
-| Adaptada | Frases curtas, mais apoio no texto e menos itens, para estudantes com deficiência |
+- Frontend: Next.js com Tailwind CSS
+- Backend: Python com FastAPI
+- Banco de dados: SQLModel
+- Autenticação: JWT
+- IA: a definir na Sprint 2
 
-O professor sempre **revisa e edita** o resultado antes de salvar ou imprimir.
+## Estrutura do repositório
 
-## Funcionalidades (MVP)
+- `frontend/`: aplicação Next.js (Sprint 1)
+- `backend/`: API FastAPI (a partir da Sprint 2)
+- `docs/`: descrição do sistema, backlog e prompt base
 
-- Cadastro e login do professor
-- Geração de atividades por nível com IA
-- Edição manual das versões geradas
-- Salvar, listar e excluir atividades
-- Exportar em PDF / imprimir
-
-## Fora do escopo (trabalhos futuros)
-
-- Correção automática de respostas
-- Integração com o RCO
-- Banco de questões
-- Perfis de turma ou aluno
-
-## Tecnologias
-
-- **Front-end:** _(definir: React ou HTML/JS)_
-- **Back-end:** _(definir: Node ou Python)_
-- **IA:** API de modelo de linguagem
-- **Banco de dados:** _(definir: SQLite ou Firebase)_
-
-## Como rodar o projeto
-
-> Preencher quando houver código.
+## Como rodar o frontend
 
 ```bash
-# 1. Clonar o repositório
-git clone https://github.com/<usuario>/nivela-ai.git
-cd nivela-ai
-
-# 2. Criar o arquivo .env com a chave da API (nunca versionar)
-cp .env.example .env
-
-# 3. Instalar dependências e executar
-# (comandos a definir conforme a tecnologia escolhida)
+cd frontend
+npm install
+npm run dev
 ```
 
-## Documentação
+Abra http://localhost:3000. Mais detalhes em [`frontend/README.md`](frontend/README.md).
 
-Os artefatos de cada sprint ficam na pasta [`docs/`](docs/).
+## Como rodar o backend
 
-- [Backlog do produto](docs/backlog.md)
+Será documentado na Sprint 2.
 
 ## Equipe
 
-- Rodrigo Gomes 
-- Plinio Koiama
-- Gavriel Takeshi
-
-**Cliente:** professor Ricardo
+- Nome 1
+- Nome 2
+- Nome 3
