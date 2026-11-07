@@ -11,6 +11,15 @@ class Nivel(str, Enum):
     adaptada = "adaptada"
 
 
+class TipoQuestoes(str, Enum):
+    multipla_escolha = "multipla_escolha"
+    aberta = "aberta"
+    mista = "mista"
+
+
+MATERIAL_MAX = 8000  # caracteres do material de apoio
+
+
 class Questao(BaseModel):
     numero: int = Field(ge=1)
     enunciado: str = Field(min_length=1)
@@ -37,6 +46,15 @@ class GerarAtividadeIn(BaseModel):
     tema: str = Field(min_length=3, max_length=200)
     quantidade: int = Field(ge=1, le=10)
     niveis: list[Nivel] = Field(min_length=1)
+    tipo: TipoQuestoes = TipoQuestoes.mista
+    material: str | None = Field(default=None, max_length=MATERIAL_MAX)
+
+    @field_validator("material")
+    @classmethod
+    def limpar_material(cls, material: str | None) -> str | None:
+        if material is None:
+            return None
+        return material.strip() or None
 
     @field_validator("niveis")
     @classmethod
