@@ -10,6 +10,7 @@ from app.schemas import (
     ItemGabarito,
     Nivel,
     Questao,
+    TipoQuestoes,
     Versao,
 )
 
@@ -59,6 +60,19 @@ def _extrair_json(texto: str) -> dict:
     return json.loads(texto[inicio : fim + 1])
 
 
+def _ajustar_tipo(questoes: list[Questao], tipo: TipoQuestoes) -> list[Questao]:
+    """Aplica o tipo pedido: abertas sem alternativas; múltipla escolha com alternativas."""
+    ajustadas = []
+    for questao in questoes:
+        alternativas = questao.alternativas or None
+        if tipo == TipoQuestoes.aberta:
+            alternativas = None
+        elif tipo == TipoQuestoes.multipla_escolha and (alternativas is None or len(alternativas) < 2):
+            raise ValueError("Questão de múltipla escolha sem alternativas.")
+        ajustadas.append(questao.model_copy(update={"alternativas": alternativas}))
+    return ajustadas
+
+
 def _normalizar(atividade: AtividadeIn, dados: GerarAtividadeIn) -> AtividadeIn:
     """Garante que a resposta da IA respeita o que o professor pediu."""
     por_nivel = {v.nivel: v for v in atividade.versoes}
@@ -70,7 +84,7 @@ def _normalizar(atividade: AtividadeIn, dados: GerarAtividadeIn) -> AtividadeIn:
     for nivel in dados.niveis:
         versao = por_nivel[nivel]
         limite = min(3, dados.quantidade) if nivel == Nivel.adaptada else dados.quantidade
-        questoes = versao.questoes[:limite]
+        questoes = _ajustar_tipo(versao.questoes[:limite], dados.tipo)
         numeros = {q.numero for q in questoes}
         gabarito = [g for g in versao.gabarito if g.numero in numeros]
         if len(gabarito) < len(questoes):
@@ -79,14 +93,23 @@ def _normalizar(atividade: AtividadeIn, dados: GerarAtividadeIn) -> AtividadeIn:
     return atividade.model_copy(update={"versoes": versoes})
 
 
+def _questao_simulada(numero: int, nivel: Nivel, dados: GerarAtividadeIn) -> Questao:
+    multipla = dados.tipo == TipoQuestoes.multipla_escolha or (
+        dados.tipo == TipoQuestoes.mista and numero % 2 == 1
+    )
+    origem = " (com base no material do professor)" if dados.material else ""
+    return Questao(
+        numero=numero,
+        enunciado=f"[Simulado] Questão {numero} sobre {dados.tema} ({nivel.value}){origem}.",
+        alternativas=["Alternativa A", "Alternativa B", "Alternativa C"] if multipla else None,
+    )
+
+
 def _gerar_simulada(dados: GerarAtividadeIn) -> AtividadeIn:
     versoes = []
     for nivel in dados.niveis:
         total = min(3, dados.quantidade) if nivel == Nivel.adaptada else dados.quantidade
-        questoes = [
-            Questao(numero=i, enunciado=f"[Simulado] Questão {i} sobre {dados.tema} ({nivel.value}).")
-            for i in range(1, total + 1)
-        ]
+        questoes = [_questao_simulada(i, nivel, dados) for i in range(1, total + 1)]
         versoes.append(
             Versao(
                 nivel=nivel,
