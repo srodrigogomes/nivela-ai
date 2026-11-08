@@ -5,10 +5,11 @@ import { useApp } from "../../context/AppContext";
 import useRequireAuth from "../../hooks/useRequireAuth";
 import { gerarAtividade } from "../../services/mockApi";
 import { NIVEIS } from "../../data/levels";
-import { DISCIPLINAS, SERIES } from "../../data/options";
+import { DISCIPLINAS, MATERIAL_MAX, SERIES, TIPOS_QUESTAO } from "../../data/options";
 import Alert from "../../components/Alert";
 import Button from "../../components/Button";
 import LevelTabs from "../../components/LevelTabs";
+import MaterialField from "../../components/MaterialField";
 import { FormField, SelectInput, TextInput } from "../../components/FormField";
 
 const FORM_INICIAL = {
@@ -17,6 +18,8 @@ const FORM_INICIAL = {
   tema: "",
   quantidade: 3,
   niveis: NIVEIS.map((n) => n.id),
+  tipo: "mista",
+  material: "",
 };
 
 export default function GerarPage() {
@@ -28,6 +31,7 @@ export default function GerarPage() {
   const [erroApi, setErroApi] = useState("");
   const [resultado, setResultado] = useState(null);
   const [salva, setSalva] = useState(false);
+  const [baseadoEmMaterial, setBaseadoEmMaterial] = useState(false);
 
   if (!user) return null;
 
@@ -50,6 +54,7 @@ export default function GerarPage() {
       novosErros.quantidade = "Use um número de 1 a 10.";
     }
     if (form.niveis.length === 0) novosErros.niveis = "Selecione ao menos um nível.";
+    if (form.material.length > MATERIAL_MAX) novosErros.material = `O material pode ter no máximo ${MATERIAL_MAX} caracteres.`;
     return novosErros;
   }
 
@@ -62,11 +67,13 @@ export default function GerarPage() {
     setLoading(true);
     setSalva(false);
     setErroApi("");
+    setBaseadoEmMaterial(form.material.trim().length > 0);
     try {
       const atividade = await gerarAtividade({
         ...form,
         tema: form.tema.trim(),
         quantidade: Number(form.quantidade),
+        material: form.material.trim(),
         niveis: NIVEIS.map((n) => n.id).filter((id) => form.niveis.includes(id)),
       });
       setResultado(atividade);
@@ -108,6 +115,14 @@ export default function GerarPage() {
           <TextInput id="tema" placeholder="Ex.: soma de frações com denominadores iguais" value={form.tema} error={errors.tema} onChange={(e) => atualizar("tema", e.target.value)} />
         </FormField>
 
+        <div className="max-w-sm">
+          <FormField label="Tipo de questão" id="tipo">
+            <SelectInput id="tipo" options={TIPOS_QUESTAO} value={form.tipo} onChange={(e) => atualizar("tipo", e.target.value)} />
+          </FormField>
+        </div>
+
+        <MaterialField value={form.material} error={errors.material} onChange={(texto) => atualizar("material", texto)} />
+
         <fieldset>
           <legend className="text-sm font-semibold">Níveis</legend>
           <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
@@ -136,6 +151,7 @@ export default function GerarPage() {
               {resultado.disciplina}, {resultado.serie}
             </p>
           </div>
+          {baseadoEmMaterial && <p className="text-sm text-teal-800">Atividade baseada no material de apoio informado.</p>}
           <LevelTabs key={resultado.gerada} versoes={resultado.versoes} />
           {salva && <Alert type="success">Atividade salva em Minhas atividades.</Alert>}
           <Button onClick={handleSalvar} disabled={salva}>
