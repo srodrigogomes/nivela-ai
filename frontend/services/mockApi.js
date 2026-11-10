@@ -35,23 +35,32 @@ function enunciados(nivel, tema) {
   return modelos[nivel];
 }
 
-export async function gerarAtividade({ disciplina, serie, tema, quantidade, niveis }) {
+function montarQuestao(numero, enunciado, nivel, tipo, material) {
+  const multipla = tipo === "multipla_escolha" || (tipo === "mista" && numero % 2 === 1);
+  const texto = material ? `${enunciado} (com base no material do professor)` : enunciado;
+  if (!multipla) return { numero, enunciado: texto };
+  const alternativas = ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"];
+  return { numero, enunciado: texto, alternativas: nivel === "adaptada" ? alternativas.slice(0, 3) : alternativas };
+}
+
+export async function gerarAtividade({ disciplina, serie, tema, quantidade, niveis, tipo = "mista", material = "" }) {
   await esperar(1500);
 
   const versoes = niveis.map((nivel) => {
     const total = nivel === "adaptada" ? Math.min(quantidade, 3) : quantidade;
     const modelos = enunciados(nivel, tema);
-    const questoes = Array.from({ length: total }, (_, i) => ({
-      numero: i + 1,
-      enunciado: modelos[i % modelos.length],
-    }));
+    const questoes = Array.from({ length: total }, (_, i) =>
+      montarQuestao(i + 1, modelos[i % modelos.length], nivel, tipo, material)
+    );
     return {
       nivel,
       instrucoes: INSTRUCOES[nivel],
       questoes,
       gabarito: questoes.map((q) => ({
         numero: q.numero,
-        resposta: `Resposta pessoal. Espera-se que o aluno mencione os pontos principais de ${tema}.`,
+        resposta: q.alternativas
+          ? "Alternativa B (exemplo)"
+          : `Resposta pessoal. Espera-se que o aluno mencione os pontos principais de ${tema}.`,
       })),
     };
   });
