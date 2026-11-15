@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.1-flash-lite"
     ai_timeout_seconds: float = 60.0
     cors_origins: str = "http://localhost:3000"
+    jwt_secret: str = ""  # obrigatório para login (defina no .env e no Render)
+    jwt_expire_minutes: int = 480
+    # usuário de demonstração opcional (recriado a cada reinício da API)
+    demo_nome: str = "Professor Demo"
+    demo_email: str = ""
+    demo_senha: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

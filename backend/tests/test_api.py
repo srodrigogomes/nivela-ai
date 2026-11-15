@@ -5,7 +5,8 @@ from app.config import settings
 from app.main import app
 from app.prompts import build_user_prompt
 from app.schemas import GerarAtividadeIn
-from app.services import ia, store
+from app.auth import seguranca
+from app.services import ia, store, usuarios
 
 client = TestClient(app)
 
@@ -18,10 +19,21 @@ PEDIDO = {
 }
 
 
+USUARIO = {"nome": "Professora Ana", "email": "ana@escola.com", "senha": "segredo123"}
+
+
 @pytest.fixture(autouse=True)
 def ambiente(monkeypatch):
+    """Prepara cada teste com um usuário logado (o cliente já envia o token)."""
     monkeypatch.setattr(settings, "ai_provider", "mock")
+    monkeypatch.setattr(settings, "jwt_secret", "segredo-de-teste")
+    monkeypatch.setattr(seguranca, "ITERACOES", 1000)  # deixa os testes rápidos
     store.limpar()
+    usuarios.limpar()
+    client.headers.pop("Authorization", None)
+    client.post("/auth/cadastro", json=USUARIO)
+    token = client.post("/auth/login", json={"email": USUARIO["email"], "senha": USUARIO["senha"]}).json()["access_token"]
+    client.headers["Authorization"] = f"Bearer {token}"
 
 
 def test_status():

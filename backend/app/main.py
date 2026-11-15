@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import atividades
+from app.services import usuarios
+from app.routers import atividades, auth
 
 app = FastAPI(
     title="nivela-ai API",
     description="API que gera atividades em diferentes níveis de aprendizagem com IA, para professores da educação básica.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -17,7 +18,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(atividades.router)
+
+usuarios.semear_demo()
 
 
 @app.get("/", tags=["Sistema"], summary="Status da API")

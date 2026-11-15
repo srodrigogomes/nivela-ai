@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from enum import Enum
 
@@ -74,3 +75,55 @@ class AtividadeIn(BaseModel):
 class Atividade(AtividadeIn):
     id: int
     criadaEm: datetime
+
+
+# ---------- autenticação ----------
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _normalizar_email(valor: str) -> str:
+    valor = valor.strip().lower()
+    if not EMAIL_RE.match(valor):
+        raise ValueError("E-mail inválido.")
+    return valor
+
+
+class CadastroIn(BaseModel):
+    nome: str = Field(min_length=2, max_length=80)
+    email: str = Field(max_length=120)
+    senha: str = Field(min_length=6, max_length=128)
+
+    @field_validator("nome")
+    @classmethod
+    def limpar_nome(cls, nome: str) -> str:
+        nome = nome.strip()
+        if len(nome) < 2:
+            raise ValueError("Informe o nome.")
+        return nome
+
+    @field_validator("email")
+    @classmethod
+    def validar_email(cls, email: str) -> str:
+        return _normalizar_email(email)
+
+
+class LoginIn(BaseModel):
+    email: str = Field(max_length=120)
+    senha: str = Field(min_length=1, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def validar_email(cls, email: str) -> str:
+        return _normalizar_email(email)
+
+
+class UsuarioOut(BaseModel):
+    id: int
+    nome: str
+    email: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
