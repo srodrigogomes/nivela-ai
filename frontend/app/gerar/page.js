@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useApp } from "../../context/AppContext";
 import useRequireAuth from "../../hooks/useRequireAuth";
-import { gerarAtividade } from "../../services/mockApi";
+import { ApiError, gerarAtividade, salvarAtividade } from "../../services/api";
 import { NIVEIS } from "../../data/levels";
 import { DISCIPLINAS, MATERIAL_MAX, SERIES, TIPOS_QUESTAO } from "../../data/options";
 import Alert from "../../components/Alert";
@@ -24,7 +24,7 @@ const FORM_INICIAL = {
 
 export default function GerarPage() {
   const user = useRequireAuth();
-  const { addActivity } = useApp();
+  const { token, logout } = useApp();
   const [form, setForm] = useState(FORM_INICIAL);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,8 @@ export default function GerarPage() {
   const [resultado, setResultado] = useState(null);
   const [salva, setSalva] = useState(false);
   const [baseadoEmMaterial, setBaseadoEmMaterial] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [demorando, setDemorando] = useState(false);
 
   if (!user) return null;
 
@@ -44,6 +46,15 @@ export default function GerarPage() {
       ...atual,
       niveis: atual.niveis.includes(id) ? atual.niveis.filter((n) => n !== id) : [...atual.niveis, id],
     }));
+  }
+
+  // Sessão expirada (401): volta ao login. Outros erros: mostra a mensagem da API.
+  function tratarErro(erro, padrao) {
+    if (erro instanceof ApiError && erro.status === 401) {
+      logout();
+      return;
+    }
+    setErroApi(erro instanceof ApiError ? erro.message : padrao);
   }
 
   function validar() {
@@ -68,25 +79,41 @@ export default function GerarPage() {
     setSalva(false);
     setErroApi("");
     setBaseadoEmMaterial(form.material.trim().length > 0);
+    const aviso = setTimeout(() => setDemorando(true), 8000);
     try {
-      const atividade = await gerarAtividade({
+      const atividade = await gerarAtividade(token, {
         ...form,
         tema: form.tema.trim(),
         quantidade: Number(form.quantidade),
         material: form.material.trim(),
         niveis: NIVEIS.map((n) => n.id).filter((id) => form.niveis.includes(id)),
       });
-      setResultado(atividade);
-    } catch {
-      setErroApi("Não foi possível gerar a atividade. Tente novamente.");
+      setResultado({ ...atividade, gerada: Date.now() });
+    } catch (erro) {
+      tratarErro(erro, "Não foi possível gerar a atividade. Tente novamente.");
     } finally {
+      clearTimeout(aviso);
+      setDemorando(false);
       setLoading(false);
     }
   }
 
-  function handleSalvar() {
-    addActivity(resultado);
-    setSalva(true);
+  async function handleSalvar() {
+    setSalvando(true);
+    setErroApi("");
+    try {
+      await salvarAtividade(token, {
+        titulo: resultado.titulo,
+        disciplina: resultado.disciplina,
+        serie: resultado.serie,
+        versoes: resultado.versoes,
+      });
+      setSalva(true);
+    } catch (erro) {
+      tratarErro(erro, "Não foi possível salvar a atividade. Tente novamente.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
   return (
@@ -94,7 +121,7 @@ export default function GerarPage() {
       <div>
         <h1 className="text-2xl font-bold">Gerar atividade</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Informe os dados e receba a mesma atividade em vários níveis. Nesta versão, o resultado é simulado.
+          Informe os dados e receba a mesma atividade em vários níveis. A IA cria um rascunho e você revisa.
         </p>
       </div>
 
@@ -139,6 +166,11 @@ export default function GerarPage() {
         <Button type="submit" loading={loading}>
           {loading ? "Gerando..." : "Gerar atividade"}
         </Button>
+        {loading && demorando && (
+          <p className="text-sm text-slate-600">
+            Está demorando mais que o normal. No primeiro acesso do dia, o servidor gratuito pode levar até 1 minuto para acordar.
+          </p>
+        )}
       </form>
 
       {erroApi && <Alert type="error">{erroApi}</Alert>}
@@ -154,7 +186,7 @@ export default function GerarPage() {
           {baseadoEmMaterial && <p className="text-sm text-teal-800">Atividade baseada no material de apoio informado.</p>}
           <LevelTabs key={resultado.gerada} versoes={resultado.versoes} />
           {salva && <Alert type="success">Atividade salva em Minhas atividades.</Alert>}
-          <Button onClick={handleSalvar} disabled={salva}>
+          <Button onClick={handleSalvar} loading={salvando} disabled={salva}>
             Salvar atividade
           </Button>
         </section>
