@@ -27,6 +27,7 @@ export default function Navbar() {
         </Link>
         {user && (
           <div className="flex items-center gap-4 text-sm">
+            <span className="hidden text-slate-500 sm:inline">{user.nome}</span>
             {LINKS.map((link) => (
               <Link
                 key={link.href}
