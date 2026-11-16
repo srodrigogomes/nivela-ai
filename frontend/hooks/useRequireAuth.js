@@ -4,14 +4,14 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "../context/AppContext";
 
-// Redireciona para o login quando não há professor autenticado.
+// Envia para o login quando não há professor autenticado (depois de tentar retomar a sessão).
 export default function useRequireAuth() {
-  const { user } = useApp();
+  const { user, iniciando } = useApp();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) router.replace("/");
-  }, [user, router]);
+    if (!iniciando && !user) router.replace("/");
+  }, [iniciando, user, router]);
 
   return user;
 }
