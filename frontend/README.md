@@ -1,6 +1,6 @@
 # Frontend do nivela-ai
 
-Next.js (App Router) com Tailwind CSS. Nesta sprint os dados são simulados (mock): a geração de atividades fica em `services/mockApi.js` e a lista inicial em `data/mockActivities.js`.
+Next.js (App Router) com Tailwind CSS. O frontend conversa com a API do backend (FastAPI) por `services/api.js`, com login por token JWT.
 
 ## Como rodar
 
@@ -12,7 +12,14 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000. Use qualquer e-mail válido e uma senha com 6 ou mais caracteres.
+Abra http://localhost:3000, crie uma conta na tela inicial e entre. O backend precisa estar rodando (veja o README da raiz).
+
+## Configurar a URL da API
+
+A URL vem da variável `NEXT_PUBLIC_API_URL`. Sem ela, o frontend usa `http://127.0.0.1:8000` (backend local).
+
+- Local: crie o arquivo `frontend/.env.local` com `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000` (opcional).
+- Vercel: em Settings, Environment Variables, defina `NEXT_PUBLIC_API_URL` com a URL do Render e faça um novo deploy (a variável é lida na hora do build).
 
 ## Versão estática
 
@@ -26,7 +33,7 @@ O site estático é gerado na pasta `out/`.
 
 - `app/`: páginas (login, gerar atividade, minhas atividades)
 - `components/`: componentes reutilizáveis (Button, Alert, FormField, LevelTabs, ActivityCard, etc.)
-- `context/`: estado global (professor logado e atividades)
+- `context/`: estado global (professor logado e token)
 - `hooks/`: hooks personalizados (`useRequireAuth`)
-- `services/`: acesso a dados (hoje simulado)
-- `data/`: dados mockados e opções do formulário
+- `services/`: chamadas à API (`api.js`)
+- `data/`: opções do formulário
