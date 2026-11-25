@@ -1,4 +1,5 @@
 import json
+import time
 
 import httpx
 
@@ -13,6 +14,10 @@ from app.schemas import (
     TipoQuestoes,
     Versao,
 )
+
+TENTATIVAS = 3
+ESPERA_SEGUNDOS = (1.0, 2.5)  # pausa antes da 2ª e da 3ª tentativa
+STATUS_TEMPORARIOS = {429, 500, 502, 503, 504}  # o Google sobrecarregado costuma passar sozinho
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 
@@ -34,18 +39,27 @@ def _chamar_gemini(prompt_usuario: str) -> str:
         "contents": [{"role": "user", "parts": [{"text": prompt_usuario}]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7},
     }
-    try:
-        resposta = httpx.post(
-            GEMINI_URL.format(modelo=settings.gemini_model),
-            headers={"x-goog-api-key": settings.gemini_api_key},
-            json=corpo,
-            timeout=settings.ai_timeout_seconds,
-        )
-    except httpx.HTTPError as erro:
-        raise IAError("Não foi possível conectar ao serviço de IA.") from erro
+    resposta = None
+    for tentativa in range(TENTATIVAS):
+        ultima = tentativa == TENTATIVAS - 1
+        try:
+            resposta = httpx.post(
+                GEMINI_URL.format(modelo=settings.gemini_model),
+                headers={"x-goog-api-key": settings.gemini_api_key},
+                json=corpo,
+                timeout=settings.ai_timeout_seconds,
+            )
+        except httpx.HTTPError as erro:
+            if ultima:
+                raise IAError("Não foi possível conectar ao serviço de IA.") from erro
+        else:
+            if resposta.status_code not in STATUS_TEMPORARIOS or ultima:
+                break
+        time.sleep(ESPERA_SEGUNDOS[tentativa])
 
-    if resposta.status_code != 200:
-        raise IAError(f"O serviço de IA respondeu com erro {resposta.status_code}.")
+    if resposta is None or resposta.status_code != 200:
+        codigo = resposta.status_code if resposta is not None else "desconhecido"
+        raise IAError(f"O serviço de IA respondeu com erro {codigo}.")
 
     try:
         return resposta.json()["candidates"][0]["content"]["parts"][0]["text"]
