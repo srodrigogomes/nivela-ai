@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import time
 
@@ -18,24 +18,24 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 
-TENTATIVAS = 3
-ESPERA_SEGUNDOS = (1.0, 2.5)  # pausa antes da 2ª e da 3ª tentativa
+TENTATIVAS = 4
+ESPERA_SEGUNDOS = (2.0, 5.0, 10.0)  # pausa antes da 2Âª e da 3Âª tentativa
 STATUS_TEMPORARIOS = {429, 500, 502, 503, 504}  # o Google sobrecarregado costuma passar sozinho
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 
 
 class IAError(Exception):
-    """Falha ao obter uma resposta utilizável da IA."""
+    """Falha ao obter uma resposta utilizÃ¡vel da IA."""
 
 
 class IANaoConfiguradaError(IAError):
-    """A chave da IA não foi configurada no servidor."""
+    """A chave da IA nÃ£o foi configurada no servidor."""
 
 
 def _chamar_gemini(prompt_usuario: str) -> str:
     if not settings.gemini_api_key:
-        raise IANaoConfiguradaError("A chave GEMINI_API_KEY não está configurada no servidor.")
+        raise IANaoConfiguradaError("A chave GEMINI_API_KEY nÃ£o estÃ¡ configurada no servidor.")
 
     corpo = {
         "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
@@ -54,7 +54,7 @@ def _chamar_gemini(prompt_usuario: str) -> str:
             )
         except httpx.HTTPError as erro:
             if ultima:
-                raise IAError("Não foi possível conectar ao serviço de IA.") from erro
+                raise IAError("NÃ£o foi possÃ­vel conectar ao serviÃ§o de IA.") from erro
         else:
             if resposta.status_code not in STATUS_TEMPORARIOS or ultima:
                 break
@@ -71,30 +71,30 @@ def _chamar_gemini(prompt_usuario: str) -> str:
             detalhe,
         )
 
-        raise IAError(f"O serviço de IA respondeu com erro {codigo}.")
+        raise IAError(f"O serviÃ§o de IA respondeu com erro {codigo}.")
 
     try:
         return resposta.json()["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, ValueError) as erro:
-        raise IAError("Resposta inesperada do serviço de IA.") from erro
+        raise IAError("Resposta inesperada do serviÃ§o de IA.") from erro
 
 
 def _extrair_json(texto: str) -> dict:
     inicio, fim = texto.find("{"), texto.rfind("}")
     if inicio == -1 or fim == -1:
-        raise ValueError("A resposta não contém JSON.")
+        raise ValueError("A resposta nÃ£o contÃ©m JSON.")
     return json.loads(texto[inicio : fim + 1])
 
 
 def _ajustar_tipo(questoes: list[Questao], tipo: TipoQuestoes) -> list[Questao]:
-    """Aplica o tipo pedido: abertas sem alternativas; múltipla escolha com alternativas."""
+    """Aplica o tipo pedido: abertas sem alternativas; mÃºltipla escolha com alternativas."""
     ajustadas = []
     for questao in questoes:
         alternativas = questao.alternativas or None
         if tipo == TipoQuestoes.aberta:
             alternativas = None
         elif tipo == TipoQuestoes.multipla_escolha and (alternativas is None or len(alternativas) < 2):
-            raise ValueError("Questão de múltipla escolha sem alternativas.")
+            raise ValueError("QuestÃ£o de mÃºltipla escolha sem alternativas.")
         ajustadas.append(questao.model_copy(update={"alternativas": alternativas}))
     return ajustadas
 
@@ -104,7 +104,7 @@ def _normalizar(atividade: AtividadeIn, dados: GerarAtividadeIn) -> AtividadeIn:
     por_nivel = {v.nivel: v for v in atividade.versoes}
     faltando = [n.value for n in dados.niveis if n not in por_nivel]
     if faltando:
-        raise ValueError(f"Níveis ausentes na resposta: {faltando}")
+        raise ValueError(f"NÃ­veis ausentes na resposta: {faltando}")
 
     versoes = []
     for nivel in dados.niveis:
@@ -126,7 +126,7 @@ def _questao_simulada(numero: int, nivel: Nivel, dados: GerarAtividadeIn) -> Que
     origem = " (com base no material do professor)" if dados.material else ""
     return Questao(
         numero=numero,
-        enunciado=f"[Simulado] Questão {numero} sobre {dados.tema} ({nivel.value}){origem}.",
+        enunciado=f"[Simulado] QuestÃ£o {numero} sobre {dados.tema} ({nivel.value}){origem}.",
         alternativas=["Alternativa A", "Alternativa B", "Alternativa C"] if multipla else None,
     )
 
@@ -139,7 +139,7 @@ def _gerar_simulada(dados: GerarAtividadeIn) -> AtividadeIn:
         versoes.append(
             Versao(
                 nivel=nivel,
-                instrucoes="[Simulado] Leia com atenção e responda.",
+                instrucoes="[Simulado] Leia com atenÃ§Ã£o e responda.",
                 questoes=questoes,
                 gabarito=[ItemGabarito(numero=q.numero, resposta="[Simulado] Resposta de exemplo.") for q in questoes],
             )
@@ -152,7 +152,7 @@ def gerar_atividade(dados: GerarAtividadeIn) -> AtividadeIn:
         return _gerar_simulada(dados)
 
     prompt = build_user_prompt(dados)
-    for _ in range(2):  # uma nova tentativa se a IA devolver algo inválido
+    for _ in range(2):  # uma nova tentativa se a IA devolver algo invÃ¡lido
         texto = _chamar_gemini(prompt)
         try:
             bruto = _extrair_json(texto)
@@ -162,4 +162,5 @@ def gerar_atividade(dados: GerarAtividadeIn) -> AtividadeIn:
             return _normalizar(atividade, dados)
         except ValueError:
             continue
-    raise IAError("A IA devolveu uma resposta inválida. Tente gerar novamente.")
+    raise IAError("A IA devolveu uma resposta invÃ¡lida. Tente gerar novamente.")
+
