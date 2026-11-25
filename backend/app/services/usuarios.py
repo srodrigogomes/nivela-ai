@@ -1,48 +1,31 @@
-from dataclasses import dataclass
-from itertools import count
+from sqlmodel import Session, select
 
 from app.auth.seguranca import hash_senha
 from app.config import settings
+from app.models import Usuario
 
 
-@dataclass
-class Usuario:
-    id: int
-    nome: str
-    email: str
-    senha_hash: str
-
-
-# Armazenamento em memória (Sprint 3). Na Sprint 4 será substituído pelo banco via SQLModel.
-_por_email: dict[str, Usuario] = {}
-_por_id: dict[int, Usuario] = {}
-_proximo_id = count(1)
-
-
-def criar(nome: str, email: str, senha_hash: str) -> Usuario:
-    usuario = Usuario(id=next(_proximo_id), nome=nome, email=email, senha_hash=senha_hash)
-    _por_email[usuario.email] = usuario
-    _por_id[usuario.id] = usuario
+def criar(session: Session, nome: str, email: str, senha_hash: str) -> Usuario:
+    usuario = Usuario(nome=nome, email=email, senha_hash=senha_hash)
+    session.add(usuario)
+    session.commit()
+    session.refresh(usuario)
     return usuario
 
 
-def buscar_por_email(email: str) -> Usuario | None:
-    return _por_email.get(email.strip().lower())
+def buscar_por_email(session: Session, email: str) -> Usuario | None:
+    consulta = select(Usuario).where(Usuario.email == email.strip().lower())
+    return session.exec(consulta).first()
 
 
-def buscar_por_id(usuario_id: int) -> Usuario | None:
-    return _por_id.get(usuario_id)
+def buscar_por_id(session: Session, usuario_id: int) -> Usuario | None:
+    return session.get(Usuario, usuario_id)
 
 
-def limpar() -> None:
-    _por_email.clear()
-    _por_id.clear()
-
-
-def semear_demo() -> None:
+def semear_demo(session: Session) -> None:
     """Cria o usuário de demonstração, se DEMO_EMAIL e DEMO_SENHA estiverem configurados."""
     if not (settings.demo_email and settings.demo_senha):
         return
     email = settings.demo_email.strip().lower()
-    if buscar_por_email(email) is None:
-        criar(settings.demo_nome, email, hash_senha(settings.demo_senha))
+    if buscar_por_email(session, email) is None:
+        criar(session, settings.demo_nome, email, hash_senha(settings.demo_senha))
