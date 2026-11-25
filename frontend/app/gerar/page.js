@@ -33,7 +33,7 @@ export default function GerarPage() {
   const [salva, setSalva] = useState(false);
   const [baseadoEmMaterial, setBaseadoEmMaterial] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [demorando, setDemorando] = useState(false);
+  const [tempoEspera, setTempoEspera] = useState(0);
 
   if (!user) return null;
 
@@ -79,7 +79,8 @@ export default function GerarPage() {
     setSalva(false);
     setErroApi("");
     setBaseadoEmMaterial(form.material.trim().length > 0);
-    const aviso = setTimeout(() => setDemorando(true), 8000);
+    setTempoEspera(0);
+    const relogio = setInterval(() => setTempoEspera((tempo) => tempo + 5), 5000);
     try {
       const atividade = await gerarAtividade(token, {
         ...form,
@@ -92,8 +93,8 @@ export default function GerarPage() {
     } catch (erro) {
       tratarErro(erro, "Não foi possível gerar a atividade. Tente novamente.");
     } finally {
-      clearTimeout(aviso);
-      setDemorando(false);
+      clearInterval(relogio);
+      setTempoEspera(0);
       setLoading(false);
     }
   }
@@ -166,10 +167,25 @@ export default function GerarPage() {
         <Button type="submit" loading={loading}>
           {loading ? "Gerando..." : "Gerar atividade"}
         </Button>
-        {loading && demorando && (
-          <p className="text-sm text-slate-600">
-            Está demorando mais que o normal. No primeiro acesso do dia, o servidor gratuito pode levar até 1 minuto para acordar.
-          </p>
+        {loading && (
+          <div role="status" aria-live="polite" className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">
+            <p className="font-medium">
+              {tempoEspera < 8
+                ? "Preparando sua atividade..."
+                : tempoEspera < 20
+                  ? "A IA está elaborando suas questões..."
+                  : tempoEspera < 40
+                    ? "Estamos aguardando a resposta da inteligência artificial..."
+                    : tempoEspera < 60
+                      ? "O serviço pode estar com alta demanda. Estamos aguardando..."
+                      : "Sua atividade ainda está sendo processada. Aguarde mais um pouco..."}
+            </p>
+            {tempoEspera >= 20 && (
+              <p className="mt-1 text-teal-800">
+                A geração pode demorar um pouco mais em períodos de alta demanda.
+              </p>
+            )}
+          </div>
         )}
       </form>
 
