@@ -1,10 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from sqlmodel import Session, select
+
 from app.auth import seguranca
 from app.config import settings
 from app.main import app
-from app.services import store, usuarios
+from app.models import Usuario
 
 client = TestClient(app)
 
@@ -16,15 +18,6 @@ PEDIDO = {
     "quantidade": 2,
     "niveis": ["reforco"],
 }
-
-
-@pytest.fixture(autouse=True)
-def ambiente(monkeypatch):
-    monkeypatch.setattr(settings, "ai_provider", "mock")
-    monkeypatch.setattr(settings, "jwt_secret", "segredo-de-teste")
-    monkeypatch.setattr(seguranca, "ITERACOES", 1000)
-    store.limpar()
-    usuarios.limpar()
 
 
 def _entrar(dados=DADOS) -> dict:
@@ -44,9 +37,10 @@ def test_cadastro_e_login():
     assert login.json()["token_type"] == "bearer" and login.json()["access_token"]
 
 
-def test_senha_nao_e_guardada_em_texto():
+def test_senha_nao_e_guardada_em_texto(banco):
     client.post("/auth/cadastro", json=DADOS)
-    guardada = usuarios.buscar_por_email("ana@escola.com").senha_hash
+    with Session(banco) as sessao:
+        guardada = sessao.exec(select(Usuario).where(Usuario.email == "ana@escola.com")).first().senha_hash
     assert guardada != DADOS["senha"] and guardada.startswith("pbkdf2_sha256$")
 
 

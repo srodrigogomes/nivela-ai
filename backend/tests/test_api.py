@@ -5,8 +5,7 @@ from app.config import settings
 from app.main import app
 from app.prompts import build_user_prompt
 from app.schemas import GerarAtividadeIn
-from app.auth import seguranca
-from app.services import ia, store, usuarios
+from app.services import ia
 
 client = TestClient(app)
 
@@ -23,13 +22,8 @@ USUARIO = {"nome": "Professora Ana", "email": "ana@escola.com", "senha": "segred
 
 
 @pytest.fixture(autouse=True)
-def ambiente(monkeypatch):
-    """Prepara cada teste com um usuário logado (o cliente já envia o token)."""
-    monkeypatch.setattr(settings, "ai_provider", "mock")
-    monkeypatch.setattr(settings, "jwt_secret", "segredo-de-teste")
-    monkeypatch.setattr(seguranca, "ITERACOES", 1000)  # deixa os testes rápidos
-    store.limpar()
-    usuarios.limpar()
+def ambiente(banco):
+    """Cada teste começa com um usuário logado (o cliente já envia o token)."""
     client.headers.pop("Authorization", None)
     client.post("/auth/cadastro", json=USUARIO)
     token = client.post("/auth/login", json={"email": USUARIO["email"], "senha": USUARIO["senha"]}).json()["access_token"]
@@ -152,3 +146,41 @@ def test_ia_aberta_descarta_alternativas(monkeypatch):
     resposta = client.post("/atividades/gerar", json=pedido)
     assert resposta.status_code == 200
     assert resposta.json()["versoes"][0]["questoes"][0]["alternativas"] is None
+
+
+class _Resposta:
+    def __init__(self, status, corpo=None):
+        self.status_code = status
+        self._corpo = corpo or {}
+
+    def json(self):
+        return self._corpo
+
+
+def _preparar_gemini(monkeypatch, respostas):
+    chamadas = []
+
+    def falso_post(*args, **kwargs):
+        chamadas.append(1)
+        return respostas.pop(0) if len(respostas) > 1 else respostas[0]
+
+    monkeypatch.setattr(settings, "ai_provider", "gemini")
+    monkeypatch.setattr(settings, "gemini_api_key", "chave-de-teste")
+    monkeypatch.setattr(ia.time, "sleep", lambda segundos: None)
+    monkeypatch.setattr(ia.httpx, "post", falso_post)
+    return chamadas
+
+
+def test_ia_tenta_de_novo_quando_o_google_responde_503(monkeypatch):
+    sucesso = _Resposta(200, {"candidates": [{"content": {"parts": [{"text": _json_ia(True)}]}}]})
+    chamadas = _preparar_gemini(monkeypatch, [_Resposta(503), sucesso])
+    pedido = {**PEDIDO, "niveis": ["reforco"], "quantidade": 1, "tipo": "mista"}
+    assert client.post("/atividades/gerar", json=pedido).status_code == 200
+    assert len(chamadas) == 2
+
+
+def test_ia_desiste_depois_de_tres_respostas_503(monkeypatch):
+    chamadas = _preparar_gemini(monkeypatch, [_Resposta(503)])
+    pedido = {**PEDIDO, "niveis": ["reforco"], "quantidade": 1}
+    assert client.post("/atividades/gerar", json=pedido).status_code == 502
+    assert len(chamadas) == ia.TENTATIVAS
