@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ai_provider: str = "gemini"  # "gemini" ou "mock" (respostas simuladas, sem chave)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_fallback_model: str = "gemini-3.5-flash"
     ai_timeout_seconds: float = 60.0
     cors_origins: str = "http://localhost:3000"
     # SQLite local por padrão; em produção use a URL do PostgreSQL (Neon) em DATABASE_URL

@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import time
 
@@ -33,51 +33,105 @@ class IANaoConfiguradaError(IAError):
     """A chave da IA nÃ£o foi configurada no servidor."""
 
 
-def _chamar_gemini(prompt_usuario: str) -> str:
-    if not settings.gemini_api_key:
-        raise IANaoConfiguradaError("A chave GEMINI_API_KEY nÃ£o estÃ¡ configurada no servidor.")
+class IATemporariamenteIndisponivelError(IAError):
+    """Falha temporária após esgotar as tentativas de conexão."""
 
-    corpo = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt_usuario}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7},
-    }
+
+def _chamar_modelo_gemini(modelo: str, corpo: dict) -> str:
     resposta = None
+    ultimo_erro = None
+
     for tentativa in range(TENTATIVAS):
         ultima = tentativa == TENTATIVAS - 1
+        resposta = None
+
         try:
             resposta = httpx.post(
-                GEMINI_URL.format(modelo=settings.gemini_model),
+                GEMINI_URL.format(modelo=modelo),
                 headers={"x-goog-api-key": settings.gemini_api_key},
                 json=corpo,
                 timeout=settings.ai_timeout_seconds,
             )
         except httpx.HTTPError as erro:
+            ultimo_erro = erro
             if ultima:
-                raise IAError("NÃ£o foi possÃ­vel conectar ao serviÃ§o de IA.") from erro
+                break
         else:
             if resposta.status_code not in STATUS_TEMPORARIOS or ultima:
                 break
+
         time.sleep(ESPERA_SEGUNDOS[tentativa])
 
-    if resposta is None or resposta.status_code != 200:
-        codigo = resposta.status_code if resposta is not None else "desconhecido"
-        detalhe = resposta.text[:2000] if resposta is not None else "Sem resposta do servidor."
+    if resposta is None:
+        logger.error(
+            "Falha de conexão com Gemini | modelo=%s | erro=%s",
+            modelo,
+            ultimo_erro,
+        )
+        raise IATemporariamenteIndisponivelError(
+            "Não foi possível conectar ao serviço de IA."
+        ) from ultimo_erro
+
+    if resposta.status_code != 200:
+        codigo = resposta.status_code
+        detalhe = resposta.text[:2000]
 
         logger.error(
             "Erro na API Gemini | modelo=%s | status=%s | detalhe=%s",
-            settings.gemini_model,
+            modelo,
             codigo,
             detalhe,
         )
 
-        raise IAError(f"O serviÃ§o de IA respondeu com erro {codigo}.")
+        if codigo in STATUS_TEMPORARIOS:
+            raise IATemporariamenteIndisponivelError(
+                f"O serviço de IA respondeu com erro temporário {codigo}."
+            )
+
+        raise IAError(f"O serviço de IA respondeu com erro {codigo}.")
 
     try:
         return resposta.json()["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, ValueError) as erro:
-        raise IAError("Resposta inesperada do serviÃ§o de IA.") from erro
+        raise IAError("Resposta inesperada do serviço de IA.") from erro
 
+
+def _chamar_gemini(prompt_usuario: str) -> str:
+    if not settings.gemini_api_key:
+        raise IANaoConfiguradaError(
+            "A chave GEMINI_API_KEY não está configurada no servidor."
+        )
+
+    corpo = {
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt_usuario}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.7,
+        },
+    }
+
+    try:
+        return _chamar_modelo_gemini(settings.gemini_model, corpo)
+
+    except IATemporariamenteIndisponivelError:
+        modelo_reserva = settings.gemini_fallback_model.strip()
+
+        if not modelo_reserva or modelo_reserva == settings.gemini_model:
+            raise
+
+        logger.warning(
+            "Modelo principal indisponível. Acionando modelo reserva: %s",
+            modelo_reserva,
+        )
+
+        try:
+            return _chamar_modelo_gemini(modelo_reserva, corpo)
+        except IATemporariamenteIndisponivelError as erro:
+            logger.error("Modelo reserva também está indisponível: %s", erro)
+            raise IAError(
+                "Os modelos principal e reserva estão temporariamente indisponíveis. Tente novamente."
+            ) from erro
 
 def _extrair_json(texto: str) -> dict:
     inicio, fim = texto.find("{"), texto.rfind("}")
