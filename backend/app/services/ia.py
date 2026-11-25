@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 
 import httpx
@@ -14,6 +15,8 @@ from app.schemas import (
     TipoQuestoes,
     Versao,
 )
+
+logger = logging.getLogger(__name__)
 
 TENTATIVAS = 3
 ESPERA_SEGUNDOS = (1.0, 2.5)  # pausa antes da 2ª e da 3ª tentativa
@@ -59,6 +62,15 @@ def _chamar_gemini(prompt_usuario: str) -> str:
 
     if resposta is None or resposta.status_code != 200:
         codigo = resposta.status_code if resposta is not None else "desconhecido"
+        detalhe = resposta.text[:2000] if resposta is not None else "Sem resposta do servidor."
+
+        logger.error(
+            "Erro na API Gemini | modelo=%s | status=%s | detalhe=%s",
+            settings.gemini_model,
+            codigo,
+            detalhe,
+        )
+
         raise IAError(f"O serviço de IA respondeu com erro {codigo}.")
 
     try:
