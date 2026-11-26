@@ -48,6 +48,49 @@
 | US13 | Como professor, quero criar uma conta para ter minhas atividades guardadas. | Média |
 | US14 | Como professor, quero entrar com e-mail e senha para acessar minhas atividades. | Média |
 
+## Épico 6: Personalização da geração
+
+| ID | História de usuário | Prioridade |
+|---|---|---|
+| US15 | Como professor, quero escolher se as questões serão de alternativas, abertas ou mistas para adequar a atividade à minha aula. | Alta |
+| US16 | Como professor, quero colar um material de apoio para que a IA crie as questões com base no que ensinei. | Alta |
+| US17 | Como professor, quero anexar um arquivo de texto (.txt ou .md) como material de apoio para não precisar copiar e colar. | Média |
+| US18 | Como professor, quero definir quantas questões serão geradas por versão (de 1 a 10). | Alta (já existia no formulário) |
+
+**Critérios de aceite (US15 e US16):**
+- Com "só abertas", nenhuma questão tem alternativas; com "só alternativas", todas têm
+- O material de apoio é opcional e limitado a 8000 caracteres
+- A API devolve erro 422 para tipo inválido ou material acima do limite
+
+## Épico 7: Segurança e integração com a API
+
+| ID | História de usuário | Prioridade |
+|---|---|---|
+| US19 | Como professor, quero que minhas atividades fiquem acessíveis só para mim, protegidas por login. | Alta |
+| US20 | Como professor, quero continuar logado ao recarregar a página e poder sair quando eu quiser. | Média |
+| US21 | Como professor, quero ver um aviso de carregamento e mensagens de erro claras quando a API demorar ou falhar. | Alta |
+| US22 | Como equipe, queremos que o frontend use a API publicada, com a URL e o CORS configurados por variáveis de ambiente. | Alta |
+
+**Critérios de aceite:**
+- Sem token, as rotas de atividades respondem 401
+- Um professor não vê nem exclui atividades de outro
+- A senha é guardada somente como hash
+- O frontend não usa mais dados mockados
+
+## Épico 8: Persistência e ajuda ao usuário
+
+| ID | História de usuário | Prioridade |
+|---|---|---|
+| US23 | Como professor, quero que minha conta e minhas atividades continuem existindo depois que o sistema reinicia. | Alta |
+| US24 | Como professor, quero uma central de ajuda dentro do sistema para tirar dúvidas sem sair da tela. | Média |
+| US25 | Como professor, quero um manual do usuário para aprender os fluxos principais. | Alta |
+| US26 | Como equipe, queremos que a API tente de novo sozinha quando o serviço de IA estiver sobrecarregado. | Média |
+
+**Critérios de aceite (US23):**
+- Contas e atividades ficam em um banco de dados hospedado (PostgreSQL)
+- Depois de reiniciar a API, o login e a lista de atividades continuam funcionando
+- Excluir uma atividade apaga também as suas versões
+
 ## Requisitos não funcionais
 
 - **RNF01:** a chave da API de IA não pode ficar exposta no front-end nem no repositório
@@ -60,6 +103,6 @@
 | Sprint | Entregas |
 |---|---|
 | Sprint 1 | Documentação, README, backlog, protótipo das telas |
-| Sprint 2 | US01 a US04 (formulário, chamada à IA, resultado) |
-| Sprint 3 | US06 a US11, US13 e US14 (edição, salvar, login) |
-| Sprint 4 | US05, US12 e polimento para a apresentação |
+| Sprint 2 | US01 a US04 (formulário, chamada à IA, resultado) e US15 a US18 (tipo de questão e material de apoio) |
+| Sprint 3 | US13 e US14 (cadastro e login com JWT), US19 a US22 (rotas protegidas, integração com a API, carregamento e erro) e US08 a US11 (salvar, listar, abrir e excluir pela API) |
+| Sprint 4 | US23 a US26 (banco de dados, central de ajuda, manual do usuário e tentativas automáticas da IA) e a entrega final |
