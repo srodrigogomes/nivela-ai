@@ -151,6 +151,7 @@ def test_ia_aberta_descarta_alternativas(monkeypatch):
 class _Resposta:
     def __init__(self, status, corpo=None):
         self.status_code = status
+        self.text = ""
         self._corpo = corpo or {}
 
     def json(self):
@@ -179,8 +180,45 @@ def test_ia_tenta_de_novo_quando_o_google_responde_503(monkeypatch):
     assert len(chamadas) == 2
 
 
-def test_ia_desiste_depois_de_tres_respostas_503(monkeypatch):
+def test_ia_desiste_quando_os_dois_modelos_estao_sobrecarregados(monkeypatch):
     chamadas = _preparar_gemini(monkeypatch, [_Resposta(503)])
     pedido = {**PEDIDO, "niveis": ["reforco"], "quantidade": 1}
-    assert client.post("/atividades/gerar", json=pedido).status_code == 502
-    assert len(chamadas) == ia.TENTATIVAS
+    resposta = client.post("/atividades/gerar", json=pedido)
+    assert resposta.status_code == 502
+    assert len(chamadas) == 2 * ia.TENTATIVAS  # modelo principal e modelo reserva
+
+
+def _gemini_com_modelos(monkeypatch, respostas):
+    """Simula o Gemini e guarda o endereço de cada chamada, para saber qual modelo foi usado."""
+    enderecos = []
+
+    def falso_post(url, *args, **kwargs):
+        enderecos.append(url)
+        return respostas.pop(0) if len(respostas) > 1 else respostas[0]
+
+    monkeypatch.setattr(settings, "ai_provider", "gemini")
+    monkeypatch.setattr(settings, "gemini_api_key", "chave-de-teste")
+    monkeypatch.setattr(settings, "gemini_model", "modelo-principal")
+    monkeypatch.setattr(settings, "gemini_fallback_model", "modelo-reserva")
+    monkeypatch.setattr(ia.time, "sleep", lambda segundos: None)
+    monkeypatch.setattr(ia.httpx, "post", falso_post)
+    return enderecos
+
+
+def test_ia_usa_o_modelo_reserva_quando_o_principal_esta_sobrecarregado(monkeypatch):
+    sucesso = _Resposta(200, {"candidates": [{"content": {"parts": [{"text": _json_ia(True)}]}}]})
+    enderecos = _gemini_com_modelos(monkeypatch, [_Resposta(503)] * ia.TENTATIVAS + [sucesso])
+    pedido = {**PEDIDO, "niveis": ["reforco"], "quantidade": 1, "tipo": "mista"}
+    assert client.post("/atividades/gerar", json=pedido).status_code == 200
+    assert len(enderecos) == ia.TENTATIVAS + 1
+    assert "modelo-principal" in enderecos[0]
+    assert "modelo-reserva" in enderecos[-1]
+
+
+def test_ia_erro_403_nao_aciona_o_modelo_reserva(monkeypatch):
+    enderecos = _gemini_com_modelos(monkeypatch, [_Resposta(403)])
+    pedido = {**PEDIDO, "niveis": ["reforco"], "quantidade": 1}
+    resposta = client.post("/atividades/gerar", json=pedido)
+    assert resposta.status_code == 502
+    assert "403" in resposta.json()["detail"]
+    assert len(enderecos) == 1  # erro permanente: não adianta tentar outro modelo
